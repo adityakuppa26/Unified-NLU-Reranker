@@ -87,7 +87,7 @@ def train_one_epoch(agent, agent_type, dataloader,configs, optimizer=None, crite
 
     return running_loss
 
-def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None):
+def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None, dataset=None):
     """
     Does inference on the model and returns the performance measures.
     Make sure model has a .predict() method that returns a tensor of predicted hypothesis.
@@ -186,7 +186,8 @@ def main(agent_type='linear', framework='dist'):
         (valid_sem_err, valid_inter_err) = valid_one_epoch(agent = agent,
                                               agent_type = agent_type,
                                               dataloader = valid_loader,
-                                              configs = cfg)
+                                              configs = cfg,
+                                              dataset = dataset)
         # log the metrics
         run.log({
             'epoch':epoch,

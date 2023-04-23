@@ -108,11 +108,11 @@ def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None):
             # forward + predicted hypothesis
             scores_batch = sample_batched['scores'].reshape(-1, Hspace*models_in_domain).to(device)
             outputs = agent.predict(scores_batch).detach().cpu().numpy()
-            pred_hyp = labels_to_hypothesis(outputs, trial_dataset)
+            pred_hyp = labels_to_hypothesis(outputs, dataset)
 
             # ground truth hypotheses
             gt_labels = sample_batched['gt_labels']
-            gt_hyp = labels_to_hypothesis(gt_labels, trial_dataset)
+            gt_hyp = labels_to_hypothesis(gt_labels, dataset)
 
             # performance measures
             sem_error += semER(pred_hyp, gt_hyp)
@@ -122,7 +122,7 @@ def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None):
 
 ######## Loading the annotated dataset ########
 
-trial_dataset = AnnotatedDataset(score_csv = SCORE_DATASET,
+dataset = AnnotatedDataset(score_csv = SCORE_DATASET,
                                  idx_csv = INDEX_DATSET,
                                  transform = ToTensor())
 
@@ -133,10 +133,10 @@ def main(agent_type='linear', framework='dist'):
     cfg = wandb.config
 
     # create train and validation data loaders
-    trial_dataset = AnnotatedDataset(score_csv = SCORE_DATASET,
+    dataset = AnnotatedDataset(score_csv = SCORE_DATASET,
                                  idx_csv = INDEX_DATSET,
                                  transform = ToTensor())
-    train_data, valid_data, test_data = random_split(trial_dataset, cfg.train_valid_test)
+    train_data, valid_data, test_data = random_split(dataset, cfg.train_valid_test)
     train_loader = DataLoader(train_data, batch_size = cfg.batch_size,
                             shuffle = True, num_workers=0)
     valid_loader = DataLoader(valid_data, batch_size = cfg.batch_size,
@@ -206,7 +206,7 @@ Hspaces = [0]+[I[i]*E[i] for i in range(len(I))]
 #     'name': 'full_dist_linear',
 #     'metric': {'goal':'minimize', 'name':'valid_sem_err'},
 #     'parameters':{
-#         "Hall": {'value': trial_dataset.Hall},  "num_of_classifiers": {'value':3},
+#         "Hall": {'value': dataset.Hall},  "num_of_classifiers": {'value':3},
 #         "Hspaces": {'value': Hspaces},
 #         "d": {'value':3}, "I":{'value':[5, 7, 3]}, "E":{'value':[10, 5, 15]},
 #         "train_valid_test":{'value':[0.65, 0.15, 0.2]},
@@ -226,7 +226,7 @@ linear_sweep_config = {
     'name': 'full_dist_linear',
     'metric': {'goal':'minimize', 'name':'valid_sem_err'},
     'parameters':{
-        "Hall": {'value': trial_dataset.Hall},  "num_of_classifiers": {'value':3},
+        "Hall": {'value': dataset.Hall},  "num_of_classifiers": {'value':3},
         "Hspaces": {'value': Hspaces},
         "d": {'value':3}, "I":{'value':[5, 7, 3]}, "E":{'value':[10, 5, 15]},
         "train_valid_test":{'value':[0.65, 0.15, 0.2]},
@@ -249,9 +249,9 @@ linear_sweep_config = {
 # wandb.agent(sweep_id, function = main)
 
 if __name__=="__main__":
-    for i in range(len(trial_dataset)):
+    for i in range(len(dataset)):
         # print(i)
-        sample = trial_dataset[i]
+        sample = dataset[i]
         if i <5:
             print('i:',i,'scores:', sample['scores'].dtype, '\n gt:', sample['gt_labels'].shape)
     existing_sweep = ''

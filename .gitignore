@@ -1,11 +1,16 @@
 # directories
 __pycache__/
 datasets/
+plots/
 .ipynb_checkpoints/
 wandb/
 
 # python
 throw.py
+alex_train.py
 
 # conda
 alexa_env/
+
+# other files
+throw.sh

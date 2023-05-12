@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
+print('Device:',device)
 
 import numpy as np
 import pandas as pd
@@ -15,16 +15,11 @@ import pandas as pd
 # %matplotlib inline
 np.set_printoptions(suppress=True)
 
-from util import AnnotatedDataset, ToTensor, labels_to_hypothesis, semER, interER, random_split
+from utils.util import AnnotatedDataset, ToTensor, labels_to_hypothesis, semER, interER, random_split
 from agents import LinUCB, LinearClassifier, DistributedLinearClassifier, nonLinearClassifier
 
 # weights and biases
 import wandb
-wandb.login(key='063ba9d8afafed34c54d2a3b805fdc272e20ff7e')
-PROJECT_NAME = "dataset_2_dist"
-ENTITY_NAME = "amazon_alexa"
-SCORE_DATASET = 'datasets/data_2_uncal_score.csv'
-INDEX_DATSET = 'datasets/data_2_hyp_idx.csv'
 
 
 ######## Upload Raw Data #############
@@ -46,7 +41,7 @@ INDEX_DATSET = 'datasets/data_2_hyp_idx.csv'
 # run.finish()
 
 
-def train_one_epoch(agent, agent_type, dataloader,configs, optimizer=None, criterion=None, distributed = None):
+def train_one_epoch(agent, agent_type, dataloader,configs, optimizer=None, criterion=None, distributed = None, device = 'cpu'):
     """
     Trains one epoch. Currently can train agent types:
       - linear classifier
@@ -87,7 +82,7 @@ def train_one_epoch(agent, agent_type, dataloader,configs, optimizer=None, crite
 
     return running_loss
 
-def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None, dataset=None):
+def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None, dataset=None, device = 'cpu'):
     """
     Does inference on the model and returns the performance measures.
     Make sure model has a .predict() method that returns a tensor of predicted hypothesis.
@@ -117,7 +112,9 @@ def valid_one_epoch(agent, agent_type, dataloader, configs, distributed = None, 
             # performance measures
             sem_error += semER(pred_hyp, gt_hyp)
             inter_error += interER(pred_hyp, gt_hyp)
-            ctr += configs.batch_size
+            # ctr += configs.batch_size
+            ctr += gt_hyp.shape[0]
+        # print('Validation epoch over. Counter:', ctr)
         return (sem_error/ctr, inter_error/ctr)
 
 ######## Loading the annotated dataset ########
@@ -126,10 +123,19 @@ dataset = AnnotatedDataset(score_csv = SCORE_DATASET,
                                  idx_csv = INDEX_DATSET,
                                  transform = ToTensor())
 
-def main(agent_type='linear', framework='dist'):
+def main(agent_type='linear', framework='unif', configs=None):
     """ Main Training Loop """
     # combined_config = config_meta_default | config_agent_default[agent_type]
+    
+    # sweep
     run = wandb.init(job_type = "sweep")
+
+    # No sweep
+    # run = wandb.init(
+    #     project = PROJECT_NAME,
+    #     job_type = "overfit_test",
+    #     config = configs
+    # )
     cfg = wandb.config
 
     # create train and validation data loaders
@@ -163,7 +169,7 @@ def main(agent_type='linear', framework='dist'):
 
 
     if agent_type == 'linUCB':
-        agent = LinUCB(alpha=cfg.lr, k=cfg.Hall, d=cfg.num_of_classifiers)
+        agent = LinUCB(alpha=cfg.lr, k=cfg.Hall, d=cfg.num_of_classifiers, device = device)
         optimizer = None; criterion = None
 
     # if torch.cuda.device_count() > 1:
@@ -197,9 +203,6 @@ def main(agent_type='linear', framework='dist'):
         })
 
 
-# W&B Sweep
-I = [5, 7, 3]; E = [10, 5, 15]
-Hspaces = [0]+[I[i]*E[i] for i in range(len(I))]
 # linear_sweep_config = {
 #     'project' : PROJECT_NAME,
 #     'entity' : ENTITY_NAME,
@@ -220,6 +223,36 @@ Hspaces = [0]+[I[i]*E[i] for i in range(len(I))]
 #         "lr": {'values':[1e-2, 1e-3, 1e-4, 1e-5]},
 #      }
 # }
+# wandb_configs = {
+#     "Hall":sum(Hspaces), "num_of_classifiers":3,
+#     "Hspaces":Hspaces,
+#     "d":len(I), "I":I, "E":E,
+#     "epochs":100,
+#     "train_valid_test":[0.65, 0.15, 0.2],
+#     "verbose_freq":3,
+#     "momentum":0.6,
+#     "hidden_dim":200,
+#     "batch_size":200,
+#     "lr":1e-4
+# }
+# existing_sweep = ''
+# sweep_id = wandb.sweep(sweep = linear_sweep_config) if existing_sweep == '' else existing_sweep
+# print('sweep id:', sweep_id, type(sweep_id))
+
+# # run the sweep
+# wandb.agent(sweep_id, function = main)
+
+wandb.login(key='063ba9d8afafed34c54d2a3b805fdc272e20ff7e')
+PROJECT_NAME = "dataset_2_dist"
+ENTITY_NAME = "amazon_alexa"
+SCORE_DATASET = 'datasets/unit_test_uncal_score.csv'
+INDEX_DATSET = 'datasets/unit_test_hyp_idx.csv'
+
+# W&B Sweep
+# I = [5, 7, 3]; E = [10, 5, 15]
+I = [2,3]; E = [3,2]
+Hspaces = [0]+[I[i]*E[i] for i in range(len(I))]
+
 linear_sweep_config = {
     'project' : PROJECT_NAME,
     'entity' : ENTITY_NAME,
@@ -229,25 +262,19 @@ linear_sweep_config = {
     'parameters':{
         "Hall": {'value': dataset.Hall},  "num_of_classifiers": {'value':3},
         "Hspaces": {'value': Hspaces},
-        "d": {'value':3}, "I":{'value':[5, 7, 3]}, "E":{'value':[10, 5, 15]},
+        "d": {'value':2}, "I":{'value':[2,3]}, "E":{'value':[3,2]},
         "train_valid_test":{'value':[0.65, 0.15, 0.2]},
         "epochs": {'value':1000},
         "verbose_freq": {'value':3},
-        "momentum": {'value': 0.6},
+        "momentum": {'value': 0.7},
         "hidden_dim": {'value': 200},
-        "batch_size": {'value': 250},
+        # "batch_size": {'value': 250},
         # "lr": {'value': 1e-3}
 
-        # "batch_size": {'values': [120, 200, 250]},
-        "lr": {'values':[1e-3, 1e-4]},
+        "batch_size": {'values': [120, 200]},
+        "lr": {'values':[1e-2,1e-3, 1e-4]},
      }
 }
-# existing_sweep = ''
-# sweep_id = wandb.sweep(sweep = linear_sweep_config) if existing_sweep == '' else existing_sweep
-# print('sweep id:', sweep_id, type(sweep_id))
-
-# # run the sweep
-# wandb.agent(sweep_id, function = main)
 
 if __name__=="__main__":
     for i in range(len(dataset)):
@@ -257,7 +284,9 @@ if __name__=="__main__":
             print('i:',i,'scores:', sample['scores'].dtype, '\n gt:', sample['gt_labels'].shape)
     existing_sweep = ''
     sweep_id = wandb.sweep(sweep = linear_sweep_config) if existing_sweep == '' else existing_sweep
-    print('sweep id:', sweep_id, type(sweep_id))
+    # print('sweep id:', sweep_id, type(sweep_id))
 
     # run the sweep
     wandb.agent(sweep_id, function = main)
+
+    # main(agent_type='linear', framework='dist', configs=wandb_configs)

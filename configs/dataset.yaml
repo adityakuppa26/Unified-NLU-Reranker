@@ -1,0 +1,21 @@
+dataset_size: 1000
+D: 2
+I: [2,3]
+E: [3,2]
+
+# accuracies
+d_acc: [0.59, 0.8]
+i_acc: [0.75, 0.73]
+e_acc: [0.99, 0.68]
+
+# ECE (Expected Calibration Errors). Larger magnitudes -> Larger error
+# Positive values are for overconfidence
+# Negative values are for underconfidence
+# ece = {'d1':-0.01}
+d_ece: [-0.01 , -0.1]
+i_ece: [-0.1  , 0.01]
+e_ece: [0.1   , -0.1]
+
+# PATHS for storing datasets
+# save-scores: "datasets/dataset_uncal_score.csv"
+# save-idx: "datasets/dataset_hyp_idx.csv"

@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import ast
+import yaml
+import os
+
 
 import torch
 import torch.nn as nn
@@ -11,6 +14,12 @@ import math
 from torch import default_generator, randperm
 from torch._utils import _accumulate
 from torch.utils.data.dataset import Subset
+
+def load_config(config_name, CONFIG_PATH):
+    with open(os.path.join(CONFIG_PATH, config_name)) as file:
+        config = yaml.safe_load(file)
+
+    return config
 
 def random_split(dataset, lengths,
                  generator=default_generator):
@@ -66,7 +75,7 @@ def random_split(dataset, lengths,
 class AnnotatedDataset(Dataset):
     """ Annotated Dataset """
 
-    def __init__(self, score_csv, idx_csv, transform = None) -> None:
+    def __init__(self, score_csv, idx_csv, transform = None, limit=None) -> None:
         super().__init__()
         """
         Args:
@@ -76,9 +85,15 @@ class AnnotatedDataset(Dataset):
         self.scores   = pd.read_csv(score_csv)
         self.idx      = pd.read_csv(idx_csv)
         print('---Annotated:', self.scores.shape, self.idx.shape)
+        print(self.scores.head())
+        if limit is not None:
+            self.scores = self.scores.head(limit)
+            self.idx = self.idx.head(limit)
+            print('Using limited dataset of size:', self.scores.shape, self.idx.shape )        
         self.idx['ground_truth'] = self.idx['ground_truth'].apply(lambda x: ast.literal_eval(x))
         self.labels   = self.idx['gt_idx']
 
+        self.num_of_classifiers = 3
         self.Hall     = int(self.scores.shape[-1]/3)
         self.transform = transform
         # print('Hall:', self.Hall)
@@ -87,7 +102,7 @@ class AnnotatedDataset(Dataset):
         return len(self.scores)
 
     def __getitem__(self, idx):
-        score = self.scores.iloc[idx,:].to_numpy().astype('float32').reshape( (3,-1), order = 'A')
+        score = self.scores.iloc[idx,:].to_numpy().astype('float32').reshape( (-1,self.Hall*3))
         gt = np.array([self.labels.iloc[idx]]).astype('int').reshape((-1,1))
         gt_one_hot = self.GTidx_to_rewards(gt).astype('int')
 
@@ -108,6 +123,10 @@ class AnnotatedDataset(Dataset):
             newY[i,Y[i]] = 1
         return newY
 
+    def get_X_Y(self):
+        data = self.__getitem__([i for i in range(self.__len__())])
+        return data['scores'], data['gt_labels']
+        
 class ToTensor(object):
     """ Convert ndarrays in sample to Tensors."""
 
@@ -149,10 +168,10 @@ def semER(hyp1, hyp2):
 
     domain_check = (hyp1[:,0] == hyp2[:,0]) # False if domain is not equal
     err = sum((1-domain_check)*len(hyp1[0])) # all dimensions need to be changed
-
+    # print('Batch size in semER:', hyp1.shape)
     for i in range(1,len(hyp1[0])): # check for intent and entity
         err += sum((hyp1[:,i] != hyp2[:,i])*(domain_check)) # add error if domain is the same
-
+    # print('----calculating semantic error',err)
     return err
 
 def interER(hyp1, hyp2):

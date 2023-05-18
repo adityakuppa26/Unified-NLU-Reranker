@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import ast
+# import ast
 
 import torch
 import torch.nn as nn
@@ -38,7 +38,7 @@ class LinUCB():
 
     def choose_arm(self, arms, ucbs):
         chosen_arm_idx = torch.argmax(ucbs, dim=1).squeeze() # 100x1
-        chosen_arm_idx = torch.tensor([7, 112, 118, 95, 79], dtype = torch.int)
+        # chosen_arm_idx = torch.tensor([7, 112, 118, 95, 79], dtype = torch.int)
         chosen_arm = torch.stack([arms[i,chosen_arm_idx[i],:] for i in range(len(chosen_arm_idx))]).reshape(-1, 3)
         return chosen_arm_idx, chosen_arm
 

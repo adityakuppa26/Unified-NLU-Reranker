@@ -41,7 +41,7 @@ def domain_scorer(dlabel, d_acc):
 
     return d_scores
 
-def intent_entity_scorer(dlabel, clabel, acc, classifier, FN_option):
+def intent_entity_scorer(dlabel, clabel, acc, classifier, FN_option= 'random'):
     """
     Generates intent/entity scores to mimic their respective accuracies.
     Parameters:
@@ -87,9 +87,9 @@ def intent_entity_scorer(dlabel, clabel, acc, classifier, FN_option):
                 while (index == clabel):
                     index = int(np.random.randint(0, C[i], 1))
 
-                scores[i][index] = acc[i]
-                scores[i][:index] = [np.around((1 - acc[i])/(C[i]-1), 3)] * len(scores[i][:index])
-                scores[i][index+1:] = [np.around((1 - acc[i])/(C[i]-1), 3)] * len(scores[i][index+1:])        
+                scores[i][index-1] = acc[i]
+                scores[i][:index-1] = [np.around((1 - acc[i])/(C[i]-1), 3)] * len(scores[i][:index-1])
+                scores[i][index:] = [np.around((1 - acc[i])/(C[i]-1), 3)] * len(scores[i][index:])        
     
     return scores
 

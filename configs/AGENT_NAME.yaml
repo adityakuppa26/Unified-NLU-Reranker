@@ -5,8 +5,8 @@ name: 'full_dist_linear'
 metric: {'goal':'minimize', 'name':'valid_sem_err'}
 
 # dataset description
-SCORE_DATASET: 'datasets/unit_test_uncal_score.csv'
-INDEX_DATASET: 'datasets/unit_test_hyp_idx.csv'
+SCORE_DATASET: '/Users/shatabdibhise/Documents/Semester-IV/696DS/Unified-NLU-Reranker/new_scores_dataset.csv'
+INDEX_DATASET: '/Users/shatabdibhise/Documents/Semester-IV/696DS/Unified-NLU-Reranker/new_idx_dataset.csv'
 Hall: 12
 num_of_classifiers: 3
 D: 2

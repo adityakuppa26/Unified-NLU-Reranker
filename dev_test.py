@@ -28,8 +28,8 @@ from utils.train_util import train_one_epoch, valid_one_epoch
 # from agents import LinearClassifier, LinUCB, nonLinearClassifier, DistributedLinearClassifier
 # from train import train_one_epoch, valid_one_epoch
 
-SCORE_DATASET = 'datasets/unit_test_uncal_score.csv'
-INDEX_DATASET = 'datasets/unit_test_hyp_idx.csv'
+SCORE_DATASET: '/Users/shatabdibhise/Documents/Semester-IV/696DS/Unified-NLU-Reranker/new_scores_dataset.csv'
+INDEX_DATASET: '/Users/shatabdibhise/Documents/Semester-IV/696DS/Unified-NLU-Reranker/new_idx_dataset.csv'
 
 from matplotlib.colors import ListedColormap
 from sklearn.model_selection import train_test_split
@@ -61,7 +61,7 @@ def all_sklearn_tests(X,Y, dataset):
         "Nearest Neighbors",
         "Linear SVM",
         "RBF SVM",
-        "Gaussian Process",
+        #"Gaussian Process",
         "Decision Tree",
         "Random Forest",
         "Neural Net",
@@ -74,7 +74,7 @@ def all_sklearn_tests(X,Y, dataset):
         KNeighborsClassifier(3),
         SVC(kernel="linear", C=0.025),
         SVC(gamma=2, C=1),
-        GaussianProcessClassifier(1.0 * RBF(1.0)),
+        #GaussianProcessClassifier(1.0 * RBF(1.0)),
         DecisionTreeClassifier(max_depth=5),
         RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1),
         MLPClassifier(alpha=1, max_iter=1000),

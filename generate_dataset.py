@@ -142,11 +142,11 @@ def cartesian_product(uncal_dataset,configs):
 
     newDF = pd.DataFrame(numpy_dataset)
 
-    # idxDF = pd.DataFrame(hyp_dataset)
-    idxDF = {}
+    idxDF = pd.DataFrame(hyp_dataset)
+    #idxDF = {}
     idxDF['ground_truth'] = uncal_dataset['ground_truth']
     idxDF['gt_idx'] = gt_idx
-    idxDF = pd.DataFrame(data = idxDF)
+    #idxDF = pd.DataFrame(data = idxDF)
     
     return newDF, idxDF
 
@@ -177,6 +177,6 @@ if __name__=="__main__":
 
     scores_dataset, idx_dataset = cartesian_product(uncalibrated_dataset, config)
     print('Scores dataset shape:', scores_dataset.shape, 'index datasets:', idx_dataset.shape)
-    # scores_dataset.to_csv(config["save-scores"], index=False)
-    # idx_dataset.to_csv(config["save-idx"])
+    scores_dataset.to_csv('new_scores_dataset.csv', index=False)
+    idx_dataset.to_csv('new_idx_dataset.csv')
 

@@ -1,6 +1,10 @@
+import warnings
+from typing import List
+
 import numpy as np
 import pandas as pd
 import ast
+import random
 
 import torch
 import torch.nn as nn
@@ -11,6 +15,7 @@ import math
 from torch import default_generator, randperm
 from torch._utils import _accumulate
 from torch.utils.data.dataset import Subset
+
 
 def random_split(dataset, lengths,
                  generator=default_generator):
@@ -57,44 +62,49 @@ def random_split(dataset, lengths,
                               f"This might result in an empty dataset.")
 
     # Cannot verify that dataset is Sized
-    if sum(lengths) != len(dataset):    # type: ignore[arg-type]
+    if sum(lengths) != len(dataset):  # type: ignore[arg-type]
         raise ValueError("Sum of input lengths does not equal the length of the input dataset!")
 
     indices = randperm(sum(lengths), generator=generator).tolist()  # type: ignore[call-overload]
-    return [Subset(dataset, indices[offset - length : offset]) for offset, length in zip(_accumulate(lengths), lengths)]
+    return [Subset(dataset, indices[offset - length: offset]) for offset, length in zip(_accumulate(lengths), lengths)]
+
 
 class AnnotatedDataset(Dataset):
     """ Annotated Dataset """
 
-    def __init__(self, score_csv, idx_csv, transform = None) -> None:
+    def __init__(self, score_csv, idx_csv, transform=None) -> None:
         super().__init__()
         """
         Args:
             score_csv (string): Path to csv file with scores
             idx_csv (string): Path to csv file with indexes representing hypotheses
         """
-        self.scores   = pd.read_csv(score_csv)
-        self.idx      = pd.read_csv(idx_csv)
+
+        #self.scores = pd.read_csv(score_csv, nrows=10)
+        s = pd.read_csv(score_csv, nrows=100000)
+        i = pd.read_csv(idx_csv, nrows=100000)
+        self.scores = s.sample(n=1000)
+        self.idx = i.sample(n=1000)
         print('---Annotated:', self.scores.shape, self.idx.shape)
         self.idx['ground_truth'] = self.idx['ground_truth'].apply(lambda x: ast.literal_eval(x))
-        self.labels   = self.idx['gt_idx']
+        self.labels = self.idx['gt_idx']
 
-        self.Hall     = int(self.scores.shape[-1]/3)
+        self.Hall = int(self.scores.shape[-1] / 3)
         self.transform = transform
         # print('Hall:', self.Hall)
 
-    def __len__(self)->int:
+    def __len__(self) -> int:
         return len(self.scores)
 
     def __getitem__(self, idx):
-        score = self.scores.iloc[idx,:].to_numpy().astype('float32').reshape( (3,-1), order = 'A')
-        gt = np.array([self.labels.iloc[idx]]).astype('int').reshape((-1,1))
+        score = self.scores.iloc[idx, :].to_numpy().astype('float32').reshape((3, -1), order='A')
+        gt = np.array([self.labels.iloc[idx]]).astype('int').reshape((-1, 1))
         gt_one_hot = self.GTidx_to_rewards(gt).astype('int')
 
         # hypothesis of 
         # gt_hyp = np.array([self.idx['ground_truth'][idx]]).astype('int').reshape(-1,3)
-        
-        sample = {'scores': score, 'gt_labels': gt, 'gt_one_hot':gt_one_hot}
+
+        sample = {'scores': score, 'gt_labels': gt, 'gt_one_hot': gt_one_hot}
 
         if self.transform:
             sample = self.transform(sample)
@@ -102,21 +112,21 @@ class AnnotatedDataset(Dataset):
         return sample
 
     def GTidx_to_rewards(self, Y):
-        
+
         newY = np.zeros((len(Y), self.Hall)).astype('float')
         for i in range(len(Y)):
-            newY[i,Y[i]] = 1
+            newY[i, Y[i]] = 1
         return newY
+
 
 class ToTensor(object):
     """ Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-
         scores, gt_one_hot, gt_labels = sample['scores'], sample['gt_one_hot'], sample['gt_labels']
 
         return {'scores': torch.from_numpy(scores).type(torch.float32),
-                'gt_one_hot':torch.from_numpy(gt_one_hot).type(torch.float32),
+                'gt_one_hot': torch.from_numpy(gt_one_hot).type(torch.float32),
                 'gt_labels': torch.from_numpy(gt_labels).type(torch.int32)}
 
 
@@ -125,21 +135,22 @@ def labels_to_hypothesis(labels, dataset):
     Takes in labels and returns the hypothesis
     """
     # print('---labels:',labels.shape)
-    labels = labels.reshape((len(labels),)) # ensure shape of labels is batchx1
+    labels = labels.reshape((len(labels),))  # ensure shape of labels is batchx1
     # print('---after:',labels.shape)
     Hall = dataset.Hall
 
     # get the order of hypotheses based on how they were stored
-    index_df = dataset.idx.iloc[0][1:3*Hall+1].to_numpy()
+    index_df = dataset.idx.iloc[0][1:3 * Hall + 1].to_numpy()
     # print('\t index_df', len(index_df))
 
     # store all hypotheses in a numpy array
-    hyp = np.zeros((len(labels),3), dtype = 'int')
-    for i,l in enumerate(labels):
+    hyp = np.zeros((len(labels), 3), dtype='int')
+    for i, l in enumerate(labels):
         # print('\t \t l:', l)
-        hyp[i,:] = index_df[l*3:l*3+3]
+        hyp[i, :] = index_df[l * 3:l * 3 + 3]
     return hyp
-    
+
+
 def semER(hyp1, hyp2):
     """
     Calculates the Semantic Error Rate between two hypothesis.
@@ -147,15 +158,16 @@ def semER(hyp1, hyp2):
     Else: returns the Levenshtein dist.
     """
 
-    domain_check = (hyp1[:,0] == hyp2[:,0]) # False if domain is not equal
-    err = sum((1-domain_check)*len(hyp1[0])) # all dimensions need to be changed
+    domain_check = (hyp1[:, 0] == hyp2[:, 0])  # False if domain is not equal
+    err = sum((1 - domain_check) * len(hyp1[0]))  # all dimensions need to be changed
 
-    for i in range(1,len(hyp1[0])): # check for intent and entity
-        err += sum((hyp1[:,i] != hyp2[:,i])*(domain_check)) # add error if domain is the same
+    for i in range(1, len(hyp1[0])):  # check for intent and entity
+        err += sum((hyp1[:, i] != hyp2[:, i]) * (domain_check))  # add error if domain is the same
 
     return err
+
 
 def interER(hyp1, hyp2):
     """ Returns the interpretation error rate. 1 if the hypotheses are not the same"""
 
-    return sum([0 if (hyp1[i]==hyp2[i]).all() else 1 for i in range(len(hyp1))])
+    return sum([0 if (hyp1[i] == hyp2[i]).all() else 1 for i in range(len(hyp1))])

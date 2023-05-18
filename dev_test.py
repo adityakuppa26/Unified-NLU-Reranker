@@ -271,7 +271,7 @@ def main():
     print('Y:',Y[0])
     Y = Y.reshape((-1,))
     # svm_testing(X,Y)
-    # all_sklearn_tests(X,Y, dataset)
+    all_sklearn_tests(X,Y, dataset)
 
     # PCA_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 3)
     # tSNE_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 3)

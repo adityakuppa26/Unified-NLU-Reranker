@@ -61,7 +61,11 @@ def all_sklearn_tests(X,Y, dataset):
         "Nearest Neighbors",
         "Linear SVM",
         "RBF SVM",
+<<<<<<< HEAD
         #"Gaussian Process",
+=======
+        # "Gaussian Process",
+>>>>>>> main-dev-tests
         "Decision Tree",
         "Random Forest",
         "Neural Net",
@@ -74,7 +78,11 @@ def all_sklearn_tests(X,Y, dataset):
         KNeighborsClassifier(3),
         SVC(kernel="linear", C=0.025),
         SVC(gamma=2, C=1),
+<<<<<<< HEAD
         #GaussianProcessClassifier(1.0 * RBF(1.0)),
+=======
+        # GaussianProcessClassifier(1.0 * RBF(1.0)),
+>>>>>>> main-dev-tests
         DecisionTreeClassifier(max_depth=5),
         RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1),
         MLPClassifier(alpha=1, max_iter=1000),
@@ -90,28 +98,29 @@ def all_sklearn_tests(X,Y, dataset):
 
     # iterate over classifiers
     for name, clf in zip(names, classifiers):
-
+        time_start = time.time()
         clf = make_pipeline(StandardScaler(), clf)
         clf.fit(X_train, y_train)
 
         # accuracies after training
         train_score = clf.score(X_train, y_train)
-        score = clf.score(X_test, y_test)
+        valid_score = clf.score(X_test, y_test)
 
         # validation for SemER
         outputs = clf.predict(X_test)
         pred_hyp = labels_to_hypothesis(outputs, dataset)
-
         # ground truth hypotheses
         gt_labels = y_test
         gt_hyp = labels_to_hypothesis(gt_labels, dataset)
 
         #performance measures
-        sem_error = semER(pred_hyp, gt_hyp)
-        inter_error = interER(pred_hyp, gt_hyp)
+        sem_error = semER(pred_hyp, gt_hyp)/len(gt_hyp)
+        inter_error = interER(pred_hyp, gt_hyp)/len(gt_hyp)
 
-        print(name, 'accuracy on test:', train_score, 'accuracy on train:', score,
-                    'with validation SemER:', sem_error)
+        print('{} accuracy on test: {} with validation SemER: {}'.format(name, valid_score, sem_error))
+        print('Accuracy on train: {}. Time elapsed: {} seconds.\n'.format(train_score, time.time()-time_start))
+        # print(name, 'accuracy on test:', train_score, 'accuracy on train:', score,
+        #             'with validation SemER:', sem_error)
 
 def svm_testing(X, Y):
     clf = svm.NuSVC(gamma = "auto")
@@ -146,10 +155,11 @@ def PCA_visualization(data_X, data_Y, total_classes, viz_components = 3, n_compo
         viz_components: total components to visualize of PCA
         n_components: components to do PCA
     """
+    # data_Y = data_Y-1
     pca = PCA(n_components = n_components)
     pca_result = pca.fit_transform(X = data_X)
     print('Explained variation per principal component: {}'.format(pca.explained_variance_ratio_))
-    
+    # print('First two eigenvectors:', pca.components_[:2])
     df = {}
     for i in range(viz_components):
         df['pca-'+str(i+1)] = pca_result[:,i]
@@ -167,7 +177,7 @@ def PCA_visualization(data_X, data_Y, total_classes, viz_components = 3, n_compo
             legend = "full",
             alpha = 0.3
         )
-        plt.savefig('plots/PCA_2_components.png')
+        plt.savefig('plots/PERFECT_PCA_2_components_noise.png')
 
     elif viz_components == 3:
         fig = plt.figure()
@@ -179,7 +189,7 @@ def PCA_visualization(data_X, data_Y, total_classes, viz_components = 3, n_compo
             c=df["y"], 
             cmap='tab10'
         )
-        fig.savefig('plots/PCA_3_components.png')
+        fig.savefig('plots/PERFECT_PCA_3_components_noise.png')
 
 def tSNE_visualization(data_X, data_Y, total_classes, viz_components = 3,n_components=10):
 
@@ -229,8 +239,9 @@ def train_agent(dataset, agent, optimizer=None, criterion=None, agent_type="line
     E = config["E"]
     Hspaces = [0]+[I[i]*E[i] for i in range(len(I))]
     config["Hspaces"] = Hspaces
-    # send model to device
-    agent.to(device)
+    if agent_type != 'linUCB':
+        # send model to device
+        agent.to(device)
 
     for epoch in range(config["epochs"]):
         # get matrics after each epoch of training and validating results.
@@ -246,15 +257,16 @@ def train_agent(dataset, agent, optimizer=None, criterion=None, agent_type="line
                                               config = config,
                                               dataset = dataset)
         
-        if epoch%10==0:
+        if epoch%40==0:
             print('Epoch:', epoch,'Training loss:', train_loss, 'Valid SemER:', valid_sem_err)
 
 
 def main():
+    np.random.seed(0)
     # folder to load config file
     CONFIG_PATH = "configs/"
     # get config from YAML
-    config = load_config("AGENT_NAME.yaml", CONFIG_PATH)
+    config = load_config("dataset_checks.yaml", CONFIG_PATH)
 
     # dataset tests first
     SCORE_DATASET = config["SCORE_DATASET"]
@@ -264,15 +276,27 @@ def main():
                                  transform = ToTensor())
 
     X,Y = dataset.get_X_Y()
+    # rndperm = np.random.permutation(X.shape[0])
+    # limiting_N = 20000
+    # X = X[rndperm[:limiting_N],:]; Y = Y[rndperm[:limiting_N]]
+
     print('X:', X.shape, 'Y:', Y.shape)
     print('scores:',X[0])
-    print('reshaped with (-1,)',X.reshape(-1, 12*3)[0])
+    print('reshaped with (-1,)',X.reshape(-1, dataset.Hall*3)[0])
     print('reshaped with (,-1)',X.reshape((len(dataset), -1))[0])
-    print('Y:',Y[0])
     Y = Y.reshape((-1,))
+    print('Y:',Y[0])
+    print('X:', X.shape, 'Y:', Y.shape)
+    
+    noise = np.random.normal(0, 0.01, size=X.shape)
+    X += noise
     # svm_testing(X,Y)
     all_sklearn_tests(X,Y, dataset)
+<<<<<<< HEAD
 
+=======
+    # PCA_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 2)
+>>>>>>> main-dev-tests
     # PCA_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 3)
     # tSNE_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 3)
     
@@ -280,21 +304,31 @@ def main():
     # Initialize agent
     Hall = config["Hall"]
     num_of_classifiers = config["num_of_classifiers"]
-    agent = agents.LinearClassifier(input_dim = Hall*num_of_classifiers,
-                                    num_of_classes = Hall)
-    optimizer = optim.SGD(agent.parameters(),
-                            lr = config["lr"],
-                            momentum = config["momentum"])
-    criterion = nn.CrossEntropyLoss()
+    # agent = agents.LinearClassifier(input_dim = Hall*num_of_classifiers,
+    #                                 num_of_classes = Hall)
+    # agent = agents.DistributedLinearClassifier(Hspaces = config["Hspaces"],
+    #                                         num_of_classifiers = num_of_classifiers)
+    # optimizer = optim.SGD(agent.parameters(),
+    #                         lr = config["lr"],
+    #                         momentum = config["momentum"])
+    # criterion = nn.CrossEntropyLoss()
 
-    # train
-    train_agent(dataset = dataset,
-                agent=agent,
-                optimizer= optimizer,
-                criterion = criterion,
-                agent_type=config["agent_type"],
-                framework=config["framework"],
-                config = config)
+    # agent = agents.LinUCB(alpha = config["lr"],
+    #                       k = Hall, d = num_of_classifiers,
+    #                       device = 'cpu')
+    # optimizer = None; criterion = None
+
+
+    # # train
+    # train_agent(dataset = dataset,
+    #             agent=agent,
+    #             optimizer= optimizer,
+    #             criterion = criterion,
+    #             agent_type=config["agent_type"],
+    #             framework=config["framework"],
+    #             config = config)
+    # if config["agent_type"] == "linUCB":
+    #     print('Linear UCB has final theta:',agent.theta())
 
 if __name__=="__main__":
     main()

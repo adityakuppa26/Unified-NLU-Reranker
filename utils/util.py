@@ -3,7 +3,7 @@ import pandas as pd
 import ast
 import yaml
 import os
-
+import warnings
 
 import torch
 import torch.nn as nn
@@ -144,13 +144,13 @@ def labels_to_hypothesis(labels, dataset):
     Takes in labels and returns the hypothesis
     """
     # print('---labels:',labels.shape)
-    labels = labels.reshape((len(labels),)) # ensure shape of labels is batchx1
+    labels = labels.reshape((len(labels),)) # ensure shape of labels is (batch,)
     # print('---after:',labels.shape)
     Hall = dataset.Hall
 
     # get the order of hypotheses based on how they were stored
     index_df = dataset.idx.iloc[0][1:3*Hall+1].to_numpy()
-    # print('\t index_df', len(index_df))
+    # print('\t util.py index_df:', len(index_df))
 
     # store all hypotheses in a numpy array
     hyp = np.zeros((len(labels),3), dtype = 'int')

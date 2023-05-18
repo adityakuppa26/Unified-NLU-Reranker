@@ -124,29 +124,35 @@ def cartesian_product(uncal_dataset,configs):
     gt_idx = np.zeros(shape=(len(uncal_dataset),)) 
 
     for idx in range(len(uncal_dataset)):
-        data_point = []; hyp_point = [] # store the scores and 
-        for d in range(D):
-            scores = [uncal_dataset['d'+str(d+1)][idx], uncal_dataset['i'+str(d+1)][idx], uncal_dataset['e'+str(d+1)][idx]]
+        data_point = []; hyp_point = [] # store the scores and hypothesis idx
+
+        for d in range(D): # since it is a restricted cartesian product, each is created separately
+            d_j = 'd'+str(d+1); i_j = 'i'+str(d+1); e_j = 'e'+str(d+1)
+
+            # get all scores for the data point (domain: scalar, intent and entity: arrays)
+            scores = [uncal_dataset[d_j][idx], uncal_dataset[i_j][idx], uncal_dataset[e_j][idx]]
             hypothesis = [[d+1], list(range(1,I[d]+1)),  list(range(1,E[d]+1))] 
             p = it.product(*scores); hyp_p = it.product(*hypothesis) # cartesian product of scores and hypothesis index
             
             for i, (v, hyp_v) in enumerate(zip(p, hyp_p)):
-                data_point += v
+                data_point += v # stacking each score (of type [d, i, e])
                 if list(hyp_v) == uncal_dataset['ground_truth'][idx]:
                     # print('index of hypothesis:',hyp_v, i,[intent_dims[j]*entity_dims[j] for j in range(d)])
                     gt_idx[idx] = i + sum([I[j]*E[j] for j in range(d)])
                 hyp_point += hyp_v
         
-        numpy_dataset[idx-1] = data_point
-        hyp_dataset[idx-1] = hyp_point
+        numpy_dataset[idx] = data_point
+        hyp_dataset[idx] = hyp_point
 
     newDF = pd.DataFrame(numpy_dataset)
 
     idxDF = pd.DataFrame(hyp_dataset)
-    #idxDF = {}
+
+    # idxDF = {}
     idxDF['ground_truth'] = uncal_dataset['ground_truth']
     idxDF['gt_idx'] = gt_idx
-    #idxDF = pd.DataFrame(data = idxDF)
+    # idxDF = pd.DataFrame(data = idxDF)
+
     
     return newDF, idxDF
 
@@ -155,7 +161,7 @@ if __name__=="__main__":
     CONFIG_PATH = "configs/"
 
     # get config from YAML
-    config = load_config("dataset.yaml", CONFIG_PATH)
+    config = load_config("dataset_large.yaml", CONFIG_PATH)
 
     # generate ground truths
     hypothesis_labels = gen_ground_truths(config)
@@ -174,9 +180,16 @@ if __name__=="__main__":
     test_dataset(uncalibrated_dataset, config, classifier_type='domain')
     test_dataset(uncalibrated_dataset, config, classifier_type='intent')
     test_dataset(uncalibrated_dataset, config, classifier_type='entity')
+    # print(uncalibrated_dataset,'\n ------^^ Uncalibrated dataset ------')
 
     scores_dataset, idx_dataset = cartesian_product(uncalibrated_dataset, config)
+<<<<<<< HEAD
     print('Scores dataset shape:', scores_dataset.shape, 'index datasets:', idx_dataset.shape)
     scores_dataset.to_csv('new_scores_dataset.csv', index=False)
     idx_dataset.to_csv('new_idx_dataset.csv')
+=======
+    # print('Scores dataset:', scores_dataset, '\n index datasets:', idx_dataset)
+    scores_dataset.to_csv(config["save-scores"], index=False)
+    idx_dataset.to_csv(config["save-idx"])
+>>>>>>> main-dev-tests
 

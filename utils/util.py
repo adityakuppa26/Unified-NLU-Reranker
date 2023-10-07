@@ -81,14 +81,25 @@ class AnnotatedDataset(Dataset):
         Args:
             score_csv (string): Path to csv file with scores
             idx_csv (string): Path to csv file with indexes representing hypotheses
+            limit (int): if we want a subset of the dataset, this contains the size
         """
         self.scores   = pd.read_csv(score_csv)
         self.idx      = pd.read_csv(idx_csv)
         print('---Annotated:', self.scores.shape, self.idx.shape)
         print(self.scores.head())
         if limit is not None:
-            self.scores = self.scores.head(limit)
-            self.idx = self.idx.head(limit)
+            # get a small random subset of data points
+            rndperm = np.random.permutation(self.scores.shape[0])
+            # X = X[rndperm[:limit],:]; Y = Y[rndperm[:limit]]
+            if limit >0:
+                self.scores = self.scores.loc[rndperm[:limit]]
+                self.idx = self.idx.loc[rndperm[:limit]]
+            else:
+                limit = abs(limit)
+                self.scores = self.scores.loc[rndperm[limit:]]
+                self.idx = self.idx.loc[rndperm[limit:]]
+            # self.scores = self.scores.head(limit)
+            # self.idx = self.idx.head(limit)
             print('Using limited dataset of size:', self.scores.shape, self.idx.shape )        
         self.idx['ground_truth'] = self.idx['ground_truth'].apply(lambda x: ast.literal_eval(x))
         self.labels   = self.idx['gt_idx']

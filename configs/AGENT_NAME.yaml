@@ -12,12 +12,13 @@ num_of_classifiers: 3
 D: 2
 I: [2,3]
 E: [3,2]
+Hspaces: [0, 6, 6]
 train_valid_test: [0.65, 0.15, 0.2]
 
 # agent parameters
 agent_type: "linear"
-framework: "unif" #either dist or unif
-epochs: 100
+framework: "dist" #either dist or unif
+epochs: 500
 momentum: 0.6
 batch_size: 200
 lr: 0.001

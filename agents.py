@@ -194,31 +194,141 @@ class DistributedLinearClassifier(nn.Module):
         return torch.argmax(y.reshape(-1,self.Hall), dim=1)
 
 
-# def Reinforce(X, Y, policy, epsilon_depth=5):
-#     for x,y in zip(X,Y):
-#         obs = torch.Tensor(x.T)
-#         reward = 0
-#         ground_truth = np.argmax(y)
-        
-#         # sampling with epsilon depth strategy
-#         probs = torch.flatten(policy(obs))  # policy(obs).reshape(-1) also works
-#         dist = torch.distributions.Categorical(probs=probs)
-#         epsilon = epsilon_depth
-#         while epsilon > 0:
-#         best_action = torch.argmax(probs)
-#         action = dist.sample().item()
-#         if action == best_action:
-#             break
-#         else:
-#             epsilon -= 1
-        
-#         # reward inference
-#         if action == ground_truth:
-#         reward = 1
+class ReinforceUnified(nn.Module):
+    def __init__(self, epsilon):
+        super().__init__()
+        # self.policy = torch.nn.Sequential(
+        #     torch.nn.Linear(3, 64),
+        #     torch.nn.ReLU(),
+        #     torch.nn.Linear(64, 1),
+        #     torch.nn.Softmax(dim=0))
 
-#         # update policy parameters
-#         log_prob = dist.log_prob(torch.tensor(action, dtype=torch.int))
-#         loss = - log_prob*reward
-#         optim.zero_grad()
-#         loss.backward()
-#         optim.step()
+        self.policy = torch.nn.Sequential(
+            torch.nn.Linear(3, 1))
+        
+        self.softmax = torch.nn.Softmax(dim=1)
+
+        self.batch_dist = None
+        self.epsilon = epsilon
+        
+    # Input: batch x 3H
+    # Returns: batch x 1 (idx of action taken)   
+    def predict(self, X):
+        # print('PREDICT')
+        # reshape batch X (batch, 3H) to (batch, H, 3)
+        obs = X.reshape((int(X.shape[0]), int(X.shape[1]/3), 3)).float()
+
+        # print('Observations:')
+        # print(obs[:4])
+
+        scores = self.softmax(self.policy(obs)) # (batch, H, 1)
+
+        # print('Softmax scores:')
+        # print(scores[:4])
+
+        dist = torch.distributions.Categorical(probs=scores.view(scores.size()[0], -1)) # dist.probs is (batch, H)
+
+        self.batch_dist = dist
+
+        # print('Categorical probs:')
+        actions = dist.sample()
+        best_actions = torch.argmax(scores, dim = 1) # the highest scored action
+
+        # epsilon-exploration
+        for i in range(scores.size()[0]):
+            single_dist = torch.distributions.Categorical(probs = scores.view(scores.size()[0], -1)[i])
+            for _ in range(self.epsilon):
+                action = single_dist.sample() # (batch, 1), idx of action taken (chosen hypothethis)
+                actions[i] = action
+                if action == best_actions[i]:
+                    break
+
+        return actions 
+    
+    # Input: actions (batch x 1), Y as in LinUCB
+    def get_rewards(self, actions, Y):
+        ground_truth_idx = torch.argmax(Y, dim=1) # convert one-hot to idx (batch, 1)
+        rewards = torch.where(actions == ground_truth_idx, torch.tensor(1), torch.tensor(-1)) # should be (batch, 1)
+        
+        return rewards
+    
+    def loss_batch(self, actions, rewards):
+        log_prob = self.batch_dist.log_prob(actions) # (batch)
+        loss = -log_prob * rewards # (batch)
+        loss_batch = torch.mean(loss) # (1)
+
+        return loss_batch
+
+
+class ReinforceDistributed(nn.Module):
+    def __init__(self, epsilon, Hspaces, num_of_classifiers):
+        super().__init__()
+        self.Hall = sum(Hspaces)
+        self.Hspaces = Hspaces
+        self.score_splits = [sum(Hspaces[:i+1])*num_of_classifiers for i in range(1,len(Hspaces)-1)]
+        self.num_of_classifiers = num_of_classifiers
+
+        # self.policy = torch.nn.Sequential(
+        #     torch.nn.Linear(3, 1))
+        
+        # make one policy for each domain
+        self.policies = nn.ModuleList()
+        for d in range(1, len(Hspaces)):
+            self.policies.append(nn.Linear(self.num_of_classifiers, 1))
+        
+        self.softmax = torch.nn.Softmax(dim=1)
+
+        self.batch_dist = None
+        self.epsilon = epsilon
+        
+    # Input: batch x 3H
+    # Returns: batch x 1 (idx of action taken)   
+    def predict(self, X):
+        # split scores so that each domain agent only gets its own scores
+        x_splits = torch.tensor_split(X, self.score_splits, dim=1)
+        
+        # forward pass for all agents
+        scores_i = []
+        for policy, X_i in zip(self.policies, x_splits):
+            # reshape batch X (batch, 3H_i) to (batch, H_i, 3)
+            obs = X_i.reshape((int(X_i.shape[0]), int(X_i.shape[1]/3), 3)).float()
+            scores_i.append(self.softmax(policy(obs))) # (batch, H_i, 1)
+            # print('-------X: {}, Obs: {}'.format(X_i.shape, obs.shape))
+            throw = X_i.reshape((int(X_i.shape[0]), int(X_i.shape[1]/3), 3))
+            # print('Reshaped:', throw[0,:,:])
+            # print('OG:', X_i[0])
+        # concatenate distributed scores
+        scores = torch.cat(scores_i, dim=1)
+
+        # create distributions using scores
+        dist = torch.distributions.Categorical(probs=scores.view(scores.size()[0], -1)) # dist.probs is (batch, H)
+        self.batch_dist = dist
+
+        # print('Categorical probs:')
+        actions = dist.sample()
+        best_actions = torch.argmax(scores, dim = 1) # the highest scored action
+
+        # # epsilon-exploration
+        for i in range(scores.size()[0]):
+            single_dist = torch.distributions.Categorical(probs = scores.view(scores.size()[0], -1)[i])
+            for _ in range(self.epsilon):
+                action = single_dist.sample() # (batch, 1), idx of action taken (chosen hypothethis)
+                actions[i] = action
+                if action == best_actions[i]:
+                    break
+
+        return actions 
+    
+    # Input: actions (batch x 1), Y as in LinUCB
+    def get_rewards(self, actions, Y):
+        ground_truth_idx = torch.argmax(Y, dim=1) # convert one-hot to idx (batch, 1)
+        rewards = torch.where(actions == ground_truth_idx, torch.tensor(1), torch.tensor(-1)) # should be (batch, 1)
+        
+        return rewards
+    
+    def loss_batch(self, actions, rewards):
+        log_prob = self.batch_dist.log_prob(actions) # (batch)
+        loss = -log_prob * rewards # (batch)
+        loss_batch = torch.mean(loss) # (1)
+
+        return loss_batch

@@ -25,7 +25,7 @@ def train_one_epoch(agent, agent_type, dataloader,config, optimizer=None, criter
         gt_labels = sample_batched['gt_labels'].to(device)
         
         if agent_type == 'linear':
-            label = torch.tensor(gt_labels)
+            # label = torch.tensor(gt_labels)
             optimizer.zero_grad()
             
             # forward + backward + optimize
@@ -44,6 +44,26 @@ def train_one_epoch(agent, agent_type, dataloader,config, optimizer=None, criter
             
             # update statistics
             running_loss += -reward # negative reward so that minimizing objective is equivalent
+
+        # Reinforce
+        elif agent_type == 'reinforce':
+            # print("I'm here and I'm ReinforceUnified")
+            optimizer.zero_grad()
+
+            # # print poilcy weights
+            # print('POLICY WEIGHTS')
+            # for name, param in agent.policy.named_parameters():
+            #      if param.requires_grad:
+            #          print(name, param.data)
+            
+            outputs = agent.predict(scores_batch)
+            rewards = agent.get_rewards(outputs, gt_one_hot.reshape((-1, Hspace)))
+            loss = agent.loss_batch(actions = outputs, rewards = rewards)
+            loss.backward()
+            optimizer.step()
+
+            # update statistics
+            running_loss = loss.item()
 
         else:
             label = torch.tensor(gt_labels)

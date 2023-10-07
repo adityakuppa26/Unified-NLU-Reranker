@@ -250,7 +250,7 @@ def train_agent(dataset, agent, optimizer=None, criterion=None, agent_type="line
                                               dataset = dataset)
         
         if epoch%40==0:
-            print('Epoch:', epoch,'Training loss:', train_loss, 'Valid SemER:', valid_sem_err)
+            print('Epoch: {}, Training loss: {}, Valid SemER: {}'.format(epoch,train_loss,valid_sem_err))
 
 
 def main():
@@ -258,7 +258,7 @@ def main():
     # folder to load config file
     CONFIG_PATH = "configs/"
     # get config from YAML
-    config = load_config("dataset_checks.yaml", CONFIG_PATH)
+    config = load_config("agent_reinforce.yaml", CONFIG_PATH)
 
     # dataset tests first
     SCORE_DATASET = config["SCORE_DATASET"]
@@ -283,7 +283,7 @@ def main():
     noise = np.random.normal(0, 0.01, size=X.shape)
     X += noise
     # svm_testing(X,Y)
-    all_sklearn_tests(X,Y, dataset)
+    # all_sklearn_tests(X,Y, dataset)
     # PCA_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 2)
     # PCA_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 3)
     # tSNE_visualization(data_X=X, data_Y=Y, total_classes=dataset.Hall, viz_components = 3)
@@ -301,20 +301,28 @@ def main():
     #                         momentum = config["momentum"])
     # criterion = nn.CrossEntropyLoss()
 
+    # LinUCB Unified
     # agent = agents.LinUCB(alpha = config["lr"],
     #                       k = Hall, d = num_of_classifiers,
     #                       device = 'cpu')
     # optimizer = None; criterion = None
 
+    # Reinforce Unified
+    agent = agents.ReinforceDistributed(epsilon = config["epsilon"],
+                                         Hspaces = config["Hspaces"],
+                                        num_of_classifiers = config["num_of_classifiers"])
+    optimizer = optim.SGD(agent.parameters(), 
+                           lr=config["lr"])
+    criterion = None
 
-    # # train
-    # train_agent(dataset = dataset,
-    #             agent=agent,
-    #             optimizer= optimizer,
-    #             criterion = criterion,
-    #             agent_type=config["agent_type"],
-    #             framework=config["framework"],
-    #             config = config)
+    # train
+    train_agent(dataset = dataset,
+                agent=agent,
+                optimizer= optimizer,
+                criterion = criterion,
+                agent_type=config["agent_type"],
+                framework=config["framework"],
+                config = config)
     # if config["agent_type"] == "linUCB":
     #     print('Linear UCB has final theta:',agent.theta())
 
